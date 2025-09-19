@@ -1,0 +1,76 @@
+name: Build and Release Pokédex Desktop
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, ubuntu-20.04, macos-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Pokédex Desktop v__VERSION__'
+          releaseBody: |
+            ## Pokédex Desktop Release
+            
+            ### Features
+            - Complete Pokédex with all generations
+            - Offline functionality after first sync
+            - Beautiful desktop interface
+            - Search and filter capabilities
+            - Favorites system
+            - Dark/Light mode toggle
+            
+            ### Download
+            - **Windows**: Download the `.exe` file
+            - **macOS**: Download the `.dmg` file  
+            - **Linux**: Download the `.AppImage` file
+            
+            ### Installation
+            Simply download and run the installer for your platform.
+            
+            ---
+            Built with ❤️ using Tauri + React + TypeScript
+          releaseDraft: false
+          prerelease: false
+          includeDebug: false
+          includeRelease: true
